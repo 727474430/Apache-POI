@@ -1,19 +1,20 @@
 package com.example.poi.util;
 
+import com.example.poi.annotation.ExportIgnore;
 import com.example.poi.entity.User;
 import org.apache.poi.hssf.usermodel.*;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.HorizontalAlignment;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.VerticalAlignment;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Created by wangliang on 2017/8/31.
@@ -26,9 +27,10 @@ public class ExportExcelUtil {
      * @param data
      * @param out
      */
-    public static void exportExcel(List<User> data, OutputStream out) {
+    public static <T> void exportExcel(List<T> data, String titleName, Map<String, String> titleMap, OutputStream out) {
         HSSFWorkbook workbook = null;
         try {
+            titleName = getSheetName(data.get(0), titleName);
             // 创建工作博
             workbook = new HSSFWorkbook();
             // 合并单元格
@@ -38,7 +40,7 @@ public class ExportExcelUtil {
             // 创建列标题样式
             HSSFCellStyle colStyle = createCellStyle(workbook, (short) 13);
             // sheet
-            HSSFSheet sheet = workbook.createSheet("用户名单");
+            HSSFSheet sheet = workbook.createSheet(titleName);
             // 添加合并单元格对象
             sheet.addMergedRegion(cellRangeAddress);
             // 默认列宽度
@@ -49,37 +51,35 @@ public class ExportExcelUtil {
             HSSFCell cell = row.createCell(0);
             // 加载单元格样式
             cell.setCellStyle(headStyle);
-            cell.setCellValue("用户列表");
+            cell.setCellValue(titleName);
             // 创建列标题
             HSSFRow titleRow = sheet.createRow(1);
-            String[] titles = {"用户名", "年龄", "性别", "邮箱", "手机"};
+            Field[] fields = getAllField(data.get(0));
             // 添加每列标题及样式
-            for (int i = 0; i < titles.length; i++) {
+            for (int i = 0; i < fields.length; i++) {
+                String fieldName = fields[i].getName();
                 HSSFCell newCell = titleRow.createCell(i);
                 newCell.setCellStyle(colStyle);
-                newCell.setCellValue(titles[i]);
+                newCell.setCellValue(titleMap.get(fieldName));
             }
+            T t = null;
             // 创建单元格 写入数据
-            if (data != null) {
+            if (data != null && !data.isEmpty()) {
                 for (int i = 0; i < data.size(); i++) {
-                    User user = data.get(i);
-                    // 写入每行数据(前两行已经被占用)
-                    HSSFRow newRow = sheet.createRow(i + 2);
-                    // 姓名
-                    HSSFCell c1 = newRow.createCell(0);
-                    c1.setCellValue(user.getName());
-                    // 年龄
-                    HSSFCell c2 = newRow.createCell(1);
-                    c2.setCellValue(user.getAge());
-                    // 性别
-                    HSSFCell c3 = newRow.createCell(2);
-                    c3.setCellValue(user.getSex() == 1 ? "男" : "女");
-                    // 邮箱
-                    HSSFCell c4 = newRow.createCell(3);
-                    c4.setCellValue(user.getEmail());
-                    // 手机
-                    HSSFCell c5 = newRow.createCell(4);
-                    c5.setCellValue(user.getPhone());
+                    t = data.get(i);
+                    Class<?> clazz = t.getClass();
+                    // 创建数据行(前两行已经被占用)
+                    HSSFRow dataRow = sheet.createRow(i + 2);
+                    for (int j = 0; j < fields.length; j++) {
+                        HSSFCell dataCell = dataRow.createCell(j);
+                        String methodName = getterName(fields[j].getName());
+                        Method method = clazz.getDeclaredMethod(methodName);
+                        if (method == null) {
+                            throw new IllegalArgumentException(clazz.getName() + " don't have method --> " + methodName);
+                        }
+                        Object result = method.invoke(t);
+                        setCellValue(dataCell, String.valueOf(result));
+                    }
                }
             }
             // 写入到文件
@@ -95,6 +95,36 @@ public class ExportExcelUtil {
             }
         }
     }
+
+    private static void setCellValue(HSSFCell dataCell, String value) {
+        dataCell.setCellType(HSSFCell.CELL_TYPE_STRING);
+        dataCell.setCellValue(value);
+    }
+
+    private static String getterName(String name) {
+        return "get" + name.substring(0, 1).toUpperCase() + name.substring(1);
+    }
+
+    private static <T> String getSheetName(T t, String title) {
+        if (title != null && !title.isEmpty()) {
+            return title;
+        }
+        return t.getClass().getSimpleName();
+    }
+
+    private static <T> Field[] getAllField(T t) {
+        List<Field> fields = new ArrayList<>();
+        Class<?> clazz = t.getClass();
+        Field[] declaredFields = clazz.getDeclaredFields();
+        for (Field field : declaredFields) {
+            ExportIgnore annotation = field.getAnnotation(ExportIgnore.class);
+            if (annotation == null) {
+                fields.add(field);
+            }
+        }
+        return fields.toArray(new Field[fields.size()]);
+    }
+
 
     /**
      * 单元格样式配置

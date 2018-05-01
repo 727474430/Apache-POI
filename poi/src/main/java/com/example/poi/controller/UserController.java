@@ -14,8 +14,8 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
 /**
  * Created by wangliang on 2017/8/31.
@@ -51,11 +51,17 @@ public class UserController {
         ServletOutputStream out = null;
         try {
             List<User> list = (List<User>) request.getSession().getAttribute("users");
+            Map<String, String> titleMap = new HashMap<>();
+            titleMap.put("name", "姓名");
+            titleMap.put("age", "年龄");
+            titleMap.put("sex", "性别");
+            titleMap.put("email", "邮箱");
+            titleMap.put("phone", "手机");
             if (list != null) {
                 response.setContentType("application/vnd.ms-excel;charset=gb2312");
-                response.setHeader("Content-Disposition", "attachment;filename = " + new String("用户列表.xls".getBytes(), "ISO-8859-1"));
+                response.setHeader("Content-Disposition", "attachment;filename = " + geneFileName());
                 out = response.getOutputStream();
-                ExportExcelUtil.exportExcel(list, out);
+                ExportExcelUtil.exportExcel(list, "用户列表", titleMap, out);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -104,5 +110,9 @@ public class UserController {
             old.addAll(list);
         }
         return "user";
+    }
+
+    public String geneFileName() {
+        return new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date()) + ".xls";
     }
 }
