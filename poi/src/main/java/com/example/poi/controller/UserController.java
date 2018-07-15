@@ -17,15 +17,18 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
+import static java.lang.System.out;
+
 /**
  * Created by wangliang on 2017/8/31.
+ * @author wangliang
  */
 @Controller
 @RequestMapping("/users")
 public class UserController {
 
     @GetMapping("/v1/list")
-    public String index(HttpSession session) {
+    public String index(HttpSession httpSession) {
         List<User> list = new ArrayList<>();
         User user1 = new User("王亮", "26", 1, "727474430@qq.com", "18215518314");
         User user2 = new User("吕佳", "29", 0, "807724703@qq.com", "18202847188");
@@ -35,8 +38,19 @@ public class UserController {
         list.add(user2);
         list.add(user3);
         list.add(user4);
-        session.setAttribute("users", list);
+        httpSession.setAttribute("users", list);
         return "user";
+    }
+
+    @PostMapping("/v1/export")
+    public void export(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        List<User> data = (List<User>) request.getSession().getAttribute("users");
+        List<String> titleNames = Arrays.asList("姓名", "年龄", "性别", "邮箱", "手机号");
+        List<String> columns = Arrays.asList("name", "age", "sex", "email", "phone");
+
+        response.setContentType("application/vnd.ms-excel;charset=gb2312");
+        response.setHeader("Content-Disposition", "attachment;filename = " + geneFileName());
+        ExportExcelUtil.export(data, titleNames, columns, response.getOutputStream());
     }
 
     /**
@@ -46,12 +60,12 @@ public class UserController {
      * @param response
      * @return
      */
-    @PostMapping("/v1/export")
+    @PostMapping("/v1/exportExcel")
     public String exportExcel(HttpServletRequest request, HttpServletResponse response) {
         ServletOutputStream out = null;
         try {
             List<User> list = (List<User>) request.getSession().getAttribute("users");
-            Map<String, String> titleMap = new HashMap<>();
+            Map<String, String> titleMap = new HashMap<>(16);
             titleMap.put("name", "姓名");
             titleMap.put("age", "年龄");
             titleMap.put("sex", "性别");
@@ -104,8 +118,9 @@ public class UserController {
         String[] fileNames = uploadDest.list();
         for (int i = 0; i < fileNames.length; i++) {
             //打印出文件名
-            System.out.println(fileNames[i]);
-            List<User> list = ExportExcelUtil.importExcel(new File(filePath + fileNames[i]));
+            out.println(fileNames[i]);
+            List<User> list = ExportExcelUtil.importExcel(new File(filePath + fileNames[i]), User.class, true);
+//            List<User> list = ExportExcelUtil.importExcel(request, User.class, true);
             List<User> old = (List<User>) request.getSession().getAttribute("users");
             old.addAll(list);
         }

@@ -10,7 +10,6 @@
     <title>Spring Boot - Freemarker</title>
     <!-- Bootstrap core CSS -->
     <link href="//cdn.jsdelivr.net/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet">
-    <link href="${base}/css/main.css" rel="stylesheet">
     <script src="http://libs.baidu.com/jquery/2.0.0/jquery.min.js"></script>
     <script src="http://libs.baidu.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
 </head>
@@ -78,7 +77,32 @@
             $("form[id=userSub]").attr('action', '${base}/users/v1/import');
         });
 
+        $("#ajaxBtn").click(function () {
+            var formData = $("#ajaxForm").serializeObject();
+            var pageData = $("#pageForm").serializeObject();
+            var data = $.extend({}, pageData, formData);
+            $.ajax({
+                url: "${base}/json/submit",
+                type: "post",
+                contentType: "application/json;charset=UTF-8",
+                dataType: "json",
+                data: JSON.stringify(data),
+                success: function (data) {
+                    console.log(data);
+                }
+            })
+        });
     })
+
+
+    $.fn.serializeObject = function () {
+        var result = {};
+        var formData = this.serializeArray();
+        $.each(formData, function (i, v) {
+            result[v.name] = v.value;
+        })
+        return result;
+    };
 </script>
 
 </html>
